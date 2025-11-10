@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "strolidlib"
+version = "0.1.0"
+description = "Shared utilities for Strolid Conserver links"
+authors = ["Strolid Dev Team <eng@strolid.com>"]
+packages = [{include = "strolidlib"}]
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+torch = "^2.4.0"
+nemo_toolkit = {version = "^2.5.2", extras = ["asr"]}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+black = "^24.10.0"
+flake8 = "^7.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+

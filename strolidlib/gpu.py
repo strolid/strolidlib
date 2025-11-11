@@ -1,8 +1,13 @@
 """GPU helper utilities shared across Conserver components."""
 
 from __future__ import annotations
-from nemo.collections.asr.models import EncDecSpeakerLabelModel
+
+from typing import TYPE_CHECKING
+
 import torch
+
+if TYPE_CHECKING:  # pragma: no cover -- type checking only
+    from nemo.collections.asr.models import EncDecSpeakerLabelModel  # type: ignore[import]
 
 
 def is_cuda_available():
@@ -72,7 +77,19 @@ def enable_tf32():
     except Exception:
         print("torch.set_float32_matmul_precision(high) failed")
 
+def _import_encdec_speaker_label_model():
+    try:
+        from nemo.collections.asr.models import EncDecSpeakerLabelModel  # type: ignore[import]
+    except ImportError as exc:  # pragma: no cover - runtime guard
+        raise ImportError(
+            "nemo_toolkit is required for load_ambernet_model(); "
+            "install strolidlib with the 'langid' extra (pip install strolidlib[langid])."
+        ) from exc
+    return EncDecSpeakerLabelModel
+
+
 def load_ambernet_model():
+    EncDecSpeakerLabelModel = _import_encdec_speaker_label_model()
     model = EncDecSpeakerLabelModel.from_pretrained(
         "langid_ambernet", refresh_cache=False
     )

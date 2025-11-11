@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import torch
 
@@ -88,7 +88,9 @@ def _import_encdec_speaker_label_model():
     return EncDecSpeakerLabelModel
 
 
-def load_ambernet_model():
+def load_ambernet_model(cuda_device: Optional[int] = None):
+    if cuda_device is not None and is_cuda_available():
+        set_cuda_device(cuda_device)
     EncDecSpeakerLabelModel = _import_encdec_speaker_label_model()
     model = EncDecSpeakerLabelModel.from_pretrained(
         "langid_ambernet", refresh_cache=False

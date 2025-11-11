@@ -30,3 +30,9 @@ def are_we_parallel(opts):
 def opts_have_changed(cur_opts, prev_opts) -> bool:
     return cur_opts != prev_opts
 
+
+def include_default_opts(opts, default_options):
+    for key, value in default_options.items():
+        if key not in opts:
+            opts[key] = value
+    return opts

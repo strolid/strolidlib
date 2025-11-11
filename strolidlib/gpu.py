@@ -4,18 +4,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
-import torch
+try:  # pragma: no cover - optional dependency
+    import torch  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency
+    torch = None  # type: ignore[assignment]
 
 if TYPE_CHECKING:  # pragma: no cover -- type checking only
+    from torch import Tensor  # type: ignore
     from nemo.collections.asr.models import EncDecSpeakerLabelModel  # type: ignore[import]
 
 
-def is_cuda_available():
-    return torch.cuda.is_available()
+def is_cuda_available() -> bool:
+    """Return True when torch with CUDA support is available."""
+    return bool(torch and torch.cuda.is_available())
 
 
 def move_to_gpu_maybe(obj):
-    if not is_cuda_available():
+    """Move torch-backed objects to GPU when possible."""
+    if torch is None:
         return obj
 
     if isinstance(obj, torch.Tensor):
@@ -32,7 +38,8 @@ def move_to_gpu_maybe(obj):
     except TypeError:
         return obj.to(torch.device("cuda"))
 
-def set_cuda_device(device_id):
+
+def set_cuda_device(device_id: int) -> bool:
     if not is_cuda_available():
         return False
 
@@ -40,19 +47,20 @@ def set_cuda_device(device_id):
     torch.cuda.synchronize(device_id)
     return True
 
-def get_cuda_device_count():
+
+def get_cuda_device_count() -> int:
     if is_cuda_available():
         return torch.cuda.device_count()
     return 0
 
 
-def get_current_cuda_device():
+def get_current_cuda_device() -> Optional[int]:
     if is_cuda_available():
         return torch.cuda.current_device()
     return None
 
 
-def cuda_synchronize(device_id=None):
+def cuda_synchronize(device_id: Optional[int] = None) -> bool:
     if not is_cuda_available():
         return False
 
@@ -63,7 +71,10 @@ def cuda_synchronize(device_id=None):
     return True
 
 
-def enable_tf32():
+def enable_tf32() -> None:
+    if torch is None:
+        return
+
     try:
         torch.backends.cuda.matmul.allow_tf32 = True
     except Exception:
@@ -77,6 +88,7 @@ def enable_tf32():
     except Exception:
         print("torch.set_float32_matmul_precision(high) failed")
 
+
 def _import_encdec_speaker_label_model():
     try:
         from nemo.collections.asr.models import EncDecSpeakerLabelModel  # type: ignore[import]
@@ -89,7 +101,7 @@ def _import_encdec_speaker_label_model():
 
 
 def load_ambernet_model(cuda_device: Optional[int] = None):
-    if cuda_device is not None and is_cuda_available():
+    if cuda_device is not None:
         set_cuda_device(cuda_device)
     EncDecSpeakerLabelModel = _import_encdec_speaker_label_model()
     model = EncDecSpeakerLabelModel.from_pretrained(
@@ -99,9 +111,13 @@ def load_ambernet_model(cuda_device: Optional[int] = None):
     model = move_to_gpu_maybe(model)
     return model
 
+
 # horseshit unreadable GPU code
 def predict_language_ambernet(model, audio_chunk):
     audio_chunk = move_to_gpu_maybe(audio_chunk)
+
+    if torch is None:
+        raise RuntimeError("torch is required to run predict_language_ambernet")
 
     with torch.no_grad():
         input_signal_length = torch.tensor([audio_chunk.shape[1]], dtype=torch.long)

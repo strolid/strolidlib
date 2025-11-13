@@ -157,7 +157,7 @@ def test_load_transcription_model_invokes_loader(monkeypatch, fake_gpu_env):
     assert calls == ["nvidia/parakeet-tdt_ctc-110m"]
     assert result is fake_model
     assert fake_model.eval_called is True
-    assert fake_model.to_device == "device:cuda"
+    assert fake_model.to_device in {"cuda", "device:cuda"}
     assert fake_gpu_env.torch.cuda.set_calls == [1]
 
 

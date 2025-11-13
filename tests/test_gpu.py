@@ -195,3 +195,4 @@ def test_enable_tf32_sets_backend_flags(fake_gpu_env):
     assert fake_gpu_env.torch.backends.cuda.matmul.allow_tf32 is True
     assert fake_gpu_env.torch.backends.cudnn.allow_tf32 is True
     assert fake_gpu_env.precision_calls == ["high"]
+

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Optional
 
 # Instead of import torch-- we instead require the use of init() for imports.
@@ -161,11 +162,18 @@ def transcribe(model, audio):
     audio = audio.astype(numpy.float32, copy=False)
     audio = move_to_gpu_maybe(audio)
     with torch.no_grad():
-        result = model.transcribe(
-            audio=[audio],
-            batch_size=1,
-            logprobs=False,
-        )
+        transcribe_kwargs = {"audio": [audio], "batch_size": 1}
+        try:
+            signature = inspect.signature(model.transcribe)
+        except (TypeError, ValueError):
+            signature = None
+        if signature and "logprobs" in signature.parameters:
+            transcribe_kwargs["logprobs"] = False
+        result = model.transcribe(**transcribe_kwargs)
 
-    transcript = result[0] if isinstance(result, (list, tuple)) else str(result)
+    transcript_obj = result[0] if isinstance(result, (list, tuple)) else result
+    if hasattr(transcript_obj, "text"):
+        transcript = transcript_obj.text
+    else:
+        transcript = str(transcript_obj)
     return transcript.strip()

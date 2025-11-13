@@ -34,3 +34,4 @@ def test_include_default_opts_preserves_existing_values():
     assert result is opts
     assert result["parallel"] is True
     assert result["cuda_device"] == 0
+

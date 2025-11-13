@@ -47,6 +47,9 @@ def is_numpy(obj) -> bool:
 def is_pyannote_pipeline(obj) -> bool:
     return hasattr(obj, "__class__") and "pyannote" in str(type(obj))
 
+def numpy_to_tensor(array: "numpy.ndarray") -> "torch.Tensor":
+    return torch.from_numpy(array)
+
 def move_to_gpu_maybe(obj):
     if not is_cuda_available():
         return obj
@@ -55,6 +58,9 @@ def move_to_gpu_maybe(obj):
         on_gpu = obj.to(device="cuda", non_blocking=True)
         on_gpu.detach()
         return on_gpu
+
+    if is_numpy(obj):
+        return obj
 
     # pyannote Pipeline.to(...) does not accept non_blocking
     if is_pyannote_pipeline(obj):
@@ -160,15 +166,19 @@ def transcribe(model, audio):
         audio = numpy.mean(audio, axis=0)
 
     audio = audio.astype(numpy.float32, copy=False)
-    audio = move_to_gpu_maybe(audio)
+    use_cuda = is_cuda_available()
+    audio_for_model = audio
+    if use_cuda:
+        audio_for_model = move_to_gpu_maybe(numpy_to_tensor(audio))
     with torch.no_grad():
-        transcribe_kwargs = {"audio": [audio], "batch_size": 1}
+        transcribe_kwargs = {"audio": [audio_for_model], "batch_size": 1}
         try:
             signature = inspect.signature(model.transcribe)
         except (TypeError, ValueError):
             signature = None
         if signature and "logprobs" in signature.parameters:
             transcribe_kwargs["logprobs"] = False
+        transcribe_kwargs["audio"] = [audio_for_model]
         result = model.transcribe(**transcribe_kwargs)
 
     transcript_obj = result[0] if isinstance(result, (list, tuple)) else result

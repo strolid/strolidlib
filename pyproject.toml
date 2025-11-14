@@ -6,14 +6,16 @@ authors = ["Jacob Howe <jacob.howe@strolid.com>"]
 packages = [{include = "strolidlib"}]
 
 [tool.poetry.dependencies]
-python = ">=3.12,<3.13"
-
-
+python = ">=3.12,<4.0"
+torch = "*"
+torchaudio = "*"
+torchvision = "*"
+nemo_toolkit = {extras = ["all"], version = "*"}
+vcon = "*"
+requests = "*"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.4.2"
-black = "^24.10.0"
-flake8 = "^7.1.1"
+pytest = "*"
 
 [build-system]
 requires = ["poetry-core"]

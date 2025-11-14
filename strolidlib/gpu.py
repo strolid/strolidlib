@@ -1,39 +1,22 @@
 """GPU helper utilities shared across Conserver components."""
-
+# TODO: Add request and pyannnote to depends
+# Add vcon to depends
+# add 
 from __future__ import annotations
 
-import inspect
+import base64
+import io
 from typing import Optional
 
-# Instead of import torch-- we instead require the use of init() for imports.
-torch = None
-numpy = None
-pyannote = None
-EncDecSpeakerLabelModel = None
-ASRModel = None
-
-def init():
-    global torch, numpy, pyannote, EncDecSpeakerLabelModel, ASRModel
-    try:
-        import torch
-    except ImportError:
-        pass
-    try:
-        import numpy
-    except ImportError:
-        pass
-    try:
-        import pyannote
-    except ImportError:
-        pass
-    try:
-        from nemo.collections.asr.models import EncDecSpeakerLabelModel
-    except ImportError:
-        pass
-    try:
-        from nemo.collections.asr.models import ASRModel
-    except ImportError:
-        pass
+import vcon
+from vcon import Vcon
+import requests
+import torch
+import torchaudio
+from torch import Tensor
+import numpy
+from nemo.collections.asr.models import EncDecSpeakerLabelModel
+from nemo.collections.asr.models import ASRModel
 
 def is_cuda_available():
     return torch.cuda.is_available()
@@ -60,7 +43,8 @@ def move_to_gpu_maybe(obj):
         return on_gpu
 
     if is_numpy(obj):
-        return obj
+        obj = numpy_to_tensor(obj)
+        return move_to_gpu_maybe(obj)
 
     # pyannote Pipeline.to(...) does not accept non_blocking
     if is_pyannote_pipeline(obj):
@@ -109,6 +93,30 @@ def enable_tf32():
     except Exception:
         print("torch.set_float32_matmul_precision(high) failed")
 
+def is_mono(audio_data: Tensor) -> bool:
+    return audio_data.shape[0] == 1
+
+def convert_to_mono(audio_data: Tensor):
+    audio_data = audio_data.mean(dim=0, keepdim=True)
+    return audio_data
+
+def ensure_mono(audio_data: Tensor) -> Tensor:
+    if not is_mono(audio_data):
+        audio_data = convert_to_mono(audio_data)
+    return audio_data
+
+def resample_tensor(audio_data: Tensor, tensor_sample_rate: int, target_sample_rate: int) -> Tensor:
+    resampler = torchaudio.transforms.Resample(orig_freq=tensor_sample_rate, new_freq=target_sample_rate)
+    return resampler(audio_data)
+
+def resample_tensor_maybe(audio_data: Tensor, tensor_sample_rate: int, target_sample_rate: int) -> Tensor:
+    if tensor_sample_rate != target_sample_rate:
+        return resample_tensor(audio_data, tensor_sample_rate, target_sample_rate)
+    return audio_data
+
+def tensor_to_contiguous(audio_data: Tensor) -> Tensor:
+    return audio_data.contiguous()
+
 def load_ambernet_model(cuda_device: Optional[int] = None):
     set_cuda_device_maybe(cuda_device)
     model = EncDecSpeakerLabelModel.from_pretrained(
@@ -145,12 +153,10 @@ def strolid_model_name_to_nemo_model_name(model_name: str) -> str | None:
 
 def load_nemo_model_maybe_refresh(model_name: str):
     try:
-        model = ASRModel.from_pretrained(model_name=model_name, refresh_cache=False)
+        return ASRModel.from_pretrained(model_name=model_name, refresh_cache=False)
     except Exception as e:
         pass
-    if model is None:
-        model = ASRModel.from_pretrained(model_name=model_name)
-    return model
+    return ASRModel.from_pretrained(model_name=model_name)
 
 def load_transcription_model(model_name: str, cuda_device: Optional[int] = None):
     set_cuda_device_maybe(cuda_device)
@@ -161,29 +167,70 @@ def load_transcription_model(model_name: str, cuda_device: Optional[int] = None)
     model.eval()
     return move_to_gpu_maybe(model)
 
+def get_first_dialog(vcon: Vcon):
+    return vcon.dialog[0]
+
+def is_valid_url(url: str) -> bool:
+    return url.startswith("http://") or url.startswith("https://") or url.startswith("www.")
+
+def load_tensor_from_url(url: str):
+    response = requests.get(url)
+    audio_buffer = io.BytesIO(response.content)
+    return torchaudio.load(audio_buffer)
+
+def load_tensor_from_b64(body: str):
+    audio_bytes = base64.b64decode(body)
+    audio_buffer = io.BytesIO(audio_bytes)
+    return torchaudio.load(audio_buffer)
+
+def dialog_to_tensor(dialog):
+    if "url" in dialog:
+        return load_tensor_from_url(dialog["url"])
+    
+    if "body" in dialog:
+        if is_valid_url(dialog["body"]):
+            return load_tensor_from_url(dialog["body"])
+        return load_tensor_from_b64(dialog["body"])
+
+def is_int(value: int | str) -> bool:
+    return isinstance(value, int)
+
+def move_to_cpu_maybe(tensor: Tensor) -> Tensor:
+    return tensor.cpu()
+
+def move_to_device_maybe(tensor: Tensor, to_device: int | str = 0) -> Tensor:
+    if to_device == "cpu":
+        move_to_cpu_maybe(tensor)
+    if is_int(to_device):
+        return move_to_gpu_maybe(tensor, to_device)
+    return tensor
+
+def preprocess_tensor(tensor: Tensor, 
+                      input_sample_rate: int = 16000,
+                      output_sample_rate: int = 16000,
+                      to_device: int | str = 0) -> Tensor:
+    ensure_mono(tensor)
+    tensor = resample_tensor_maybe(tensor, tensor.sample_rate, 16000)
+    tensor = tensor.detach()
+    tensor = tensor.cpu()
+    tensor = tensor.numpy()
+    tensor = move_to_device_maybe(tensor, to_device)
+    return tensor
+
+def load_tensor_from_vcon(vcon: Vcon):
+    """Load audio tensor from a vCon dialog.
+    
+    Returns a tensor and sample rate 
+    """
+    dialog = get_first_dialog(vcon)
+    tensor, sample_rate = dialog_to_tensor(dialog)
+    return tensor, sample_rate
+
+def load_and_preprocess_tensor_from_vcon(vcon: Vcon, output_sample_rate: int = 16000, to_device: int | str = 0):
+    tensor, input_sample_rate = load_tensor_from_vcon(vcon)
+    tensor = preprocess_tensor(tensor, input_sample_rate, output_sample_rate, to_device)
+    return tensor
+
 def transcribe(model, audio):
-    if audio.ndim > 1:
-        audio = numpy.mean(audio, axis=0)
-
-    audio = audio.astype(numpy.float32, copy=False)
-    use_cuda = is_cuda_available()
-    audio_for_model = audio
-    if use_cuda:
-        audio_for_model = move_to_gpu_maybe(numpy_to_tensor(audio))
     with torch.no_grad():
-        transcribe_kwargs = {"audio": [audio_for_model], "batch_size": 1}
-        try:
-            signature = inspect.signature(model.transcribe)
-        except (TypeError, ValueError):
-            signature = None
-        if signature and "logprobs" in signature.parameters:
-            transcribe_kwargs["logprobs"] = False
-        transcribe_kwargs["audio"] = [audio_for_model]
-        result = model.transcribe(**transcribe_kwargs)
-
-    transcript_obj = result[0] if isinstance(result, (list, tuple)) else result
-    if hasattr(transcript_obj, "text"):
-        transcript = transcript_obj.text
-    else:
-        transcript = str(transcript_obj)
-    return transcript.strip()
+        return model.transcribe(audio=[audio], batch_size=1, logprobs=False)

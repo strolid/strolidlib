@@ -35,6 +35,6 @@ def test_transcription():
     
     # Transcribe
     result = transcribe(model, audio_np)
-    
+    print(f"\nTranscription text: {result}\n")
     assert result is not None
 

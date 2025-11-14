@@ -202,7 +202,8 @@ def move_to_device_maybe(tensor: Tensor, to_device: int | str = 0) -> Tensor:
     if to_device == "cpu":
         move_to_cpu_maybe(tensor)
     if is_int(to_device):
-        return move_to_gpu_maybe(tensor, to_device)
+        set_cuda_device(to_device)
+        return move_to_gpu_maybe(tensor)
     return tensor
 
 def preprocess_tensor(tensor: Tensor, 
@@ -210,7 +211,7 @@ def preprocess_tensor(tensor: Tensor,
                       output_sample_rate: int = 16000,
                       to_device: int | str = 0) -> Tensor:
     ensure_mono(tensor)
-    tensor = resample_tensor_maybe(tensor, tensor.sample_rate, 16000)
+    tensor = resample_tensor_maybe(tensor, input_sample_rate, output_sample_rate)
     tensor = tensor.detach()
     tensor = tensor.cpu()
     tensor = tensor.numpy()
@@ -231,6 +232,10 @@ def load_and_preprocess_tensor_from_vcon(vcon: Vcon, output_sample_rate: int = 1
     tensor = preprocess_tensor(tensor, input_sample_rate, output_sample_rate, to_device)
     return tensor
 
-def transcribe(model, audio):
+def transcribe_many(model, audio_list: list[Tensor]) -> list[str]:
     with torch.no_grad():
-        return model.transcribe(audio=[audio], batch_size=1, logprobs=False)
+        hypotheses = model.transcribe(audio=audio_list)
+    return [hyp.text for hyp in hypotheses]
+
+def transcribe(model, audio: Tensor) -> str:
+    return transcribe_many(model, [audio])[0]

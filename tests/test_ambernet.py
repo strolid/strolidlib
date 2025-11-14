@@ -30,6 +30,6 @@ def test_ambernet():
     
     # Predict language
     language = predict_language_ambernet(preprocessed, model)
-    
+    print(f"Language: {language}")
     assert language in ["en", "es"]
 

@@ -29,7 +29,7 @@ def test_ambernet():
     model = load_ambernet_model()
     
     # Predict language
-    language = predict_language_ambernet(model, preprocessed)
+    language = predict_language_ambernet(preprocessed, model)
     
     assert language in ["en", "es"]
 

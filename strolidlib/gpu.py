@@ -127,7 +127,7 @@ def load_ambernet_model(cuda_device: Optional[int] = None):
     return model
 
 # horseshit unreadable GPU code
-def predict_language_ambernet(model, audio_chunk):
+def predict_language_ambernet(audio_chunk, model):
     audio_chunk = move_to_gpu_maybe(audio_chunk)
 
     with torch.no_grad():

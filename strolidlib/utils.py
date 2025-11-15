@@ -47,8 +47,6 @@ def get_first_dialog(vcon: Vcon):
 
 
 def is_valid_url(url: str) -> bool:
-    if url.startswith("www."):
-        url = "https://" + url
     return validators.url(url) is True
 
 

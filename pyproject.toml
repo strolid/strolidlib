@@ -13,6 +13,7 @@ torchvision = "*"
 nemo_toolkit = {extras = ["all"], version = "*"}
 vcon = "*"
 requests = "*"
+validators = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "*"

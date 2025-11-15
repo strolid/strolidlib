@@ -11,6 +11,7 @@ from typing import Optional
 import vcon
 from vcon import Vcon
 import requests
+from strolidlib.utils import get_first_dialog, is_valid_url, is_int
 import torch
 import torchaudio
 from torch import Tensor
@@ -167,11 +168,8 @@ def load_transcription_model(model_name: str, cuda_device: Optional[int] = None)
     model.eval()
     return move_to_gpu_maybe(model)
 
-def get_first_dialog(vcon: Vcon):
-    return vcon.dialog[0]
-
-def is_valid_url(url: str) -> bool:
-    return url.startswith("http://") or url.startswith("https://") or url.startswith("www.")
+def load_langid_model(model_name: str, cuda_device: Optional[int] = None):
+    return load_ambernet_model(cuda_device)
 
 def load_tensor_from_url(url: str):
     response = requests.get(url)
@@ -191,9 +189,6 @@ def dialog_to_tensor(dialog):
         if is_valid_url(dialog["body"]):
             return load_tensor_from_url(dialog["body"])
         return load_tensor_from_b64(dialog["body"])
-
-def is_int(value: int | str) -> bool:
-    return isinstance(value, int)
 
 def move_to_cpu_maybe(tensor: Tensor) -> Tensor:
     return tensor.cpu()

@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "strolidlib"
+version = "0.1.0"
+description = "GPU utilities and helpers for Strolid services"
+authors = ["Strolid"]
+readme = "README.md"
+packages = [{include = "strolidlib"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4"
+numpy = "*"
+torch = "*"
+torchaudio = "*"
+nemo-toolkit = {extras = ["asr"], version = "*"}
+vcon = "*"
+requests = "*"
+validators = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
